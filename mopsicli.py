@@ -2,6 +2,7 @@ import click
 import json
 import sys
 import requests
+from termcolor import colored
 
 #BASEURL = 'http://mesosmaster02:8080'
 #APIVERSION = '/v2/'
@@ -46,16 +47,12 @@ def marathon_getinfoapp(name,fields,listfields):
 		data = r.json()   
 		if listfields:
 			try:
-				print 'App as the following variables: \n'
-				for each in data["app"]:
-					print each
+				walk(data["app"])	
 			except: 
 				print 'Unexpected error:',sys.exc_info()[0] 
 		elif fields:
 			try:
-				for each in data["app"]:
-					if each == fields:
-						print "%s : %s" % (each, data["app"][fields])
+				getKeyValue(data["app"],fields)
 			except:
 				print 'Value %s not in json array ' % fields				
 		else:
@@ -93,12 +90,14 @@ def marathon_killapp(name):
 @click.argument('filename')
 def marathon_startapp(filename):
 	"""Start a app. Reads input from jsonfile."""
+	
 	try:
 		fileData = open(filename)
 		url =  BASEURL+APIVERSION+'apps' 
 		payload = json.load(fileData)
 		headers = {'content-type':'application/json'}
 		r = requests.post(url,data=json.dumps(payload),headers=headers)
+		print r.text	
 
 	except requests.exceptions.RequestException as e:
 		print 'HTTP error: ',e 
@@ -119,6 +118,7 @@ def marathon_changeapp(name,filename):
 		payload = json.load(fileData)
 		headers = {'content-type':'application/json'}
 		r = requests.put(url,data=json.dumps(payload),headers=headers)
+		print r.text
 
 	except requests.exceptions.RequestException as e:
 		print 'HTTP error: ',e 
@@ -138,6 +138,7 @@ def marathon_scaleapp(name,count):
 		payload = {"instances" : count }
 		headers = {'content-type':'application/json'}
 		r = requests.put(url,data=json.dumps(payload),headers=headers)
+		print r.text
 
 	except requests.exceptions.RequestException as e:
 		print 'HTTP error: ', e 
@@ -145,3 +146,18 @@ def marathon_scaleapp(name,count):
 	except:
 		print 'Unexpected error:', sys.exc_info()[0]  
 		raise
+
+def walk(node):
+	for key,item in node.items():
+			if isinstance(item,dict):
+				walk(item)
+			else: 
+				print colored(key,'red'), ':', item	
+
+def getKeyValue(node,searchkey):
+	for key,item in node.items():
+			if isinstance(item,dict):
+				getKeyValue(item,searchkey)
+			else: 
+				if key == searchkey:
+					print colored(key,'red'), ':', item	
