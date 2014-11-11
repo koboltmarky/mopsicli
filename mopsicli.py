@@ -3,6 +3,10 @@ import json
 import sys
 import requests
 from termcolor import colored
+from marathon.models import MarathonApp
+from marathon.models.container import MarathonContainer
+from marathon.models.container import MarathonDockerContainer
+from marathon import MarathonClient
 
 #BASEURL = 'http://mesosmaster02:8080'
 #APIVERSION = '/v2/'
@@ -66,18 +70,18 @@ def marathon_getinfoapp(name,fields,listfields):
 		raise
 
 @marathon.command('kill')
-@click.argument('name')
-def marathon_killapp(name):
+@click.argument('id')
+def marathon_killapp(id):
 	"""Kills a running app"""
 	
 	try:
-		url = BASEURL+APIVERSION+'apps/'+name
+		url = BASEURL+APIVERSION+'apps/'+id
 		r = requests.delete(url)
 		
 		if r.status_code == 200:
-			print "Delete app %s succesful" % name
+			print "Delete app %s succesful" % id
 		else:
-			print 'Cannot delete app %s' % name 
+			print 'Cannot delete app %s' % id
 
 	except requests.exceptions.RequestException as e:
 		print 'HTTP error: ',e 
@@ -87,16 +91,23 @@ def marathon_killapp(name):
 		raise
 
 @marathon.command('start')
-@click.argument('filename')
-def marathon_startapp(filename):
-	"""Start a app. Reads input from jsonfile."""
+@click.argument('id')
+@click.argument('image')
+@click.argument('cmd')
+@click.option('--instances',default=1,help='number of instances')
+@click.option('--mem',default=64,help='memory to use')
+@click.option('--cpus',default=1,help='cpus to use')
+def marathon_startapp(image,instances,mem,cpus,cmd,id):
+	"""Start a app."""
 	
 	try:
-		fileData = open(filename)
 		url =  BASEURL+APIVERSION+'apps' 
-		payload = json.load(fileData)
+		dockerContainer = MarathonDockerContainer(image,'BRIDGE',[])
+		marathonContainer = MarathonContainer(dockerContainer,'DOCKER',[])
+		app = MarathonApp(id=id,cmd=cmd,mem=mem,cpus=cpus,container=marathonContainer,instances=instances)
+		payload = app.to_json()
 		headers = {'content-type':'application/json'}
-		r = requests.post(url,data=json.dumps(payload),headers=headers)
+		r = requests.post(url,payload,headers=headers)
 		print r.text	
 
 	except requests.exceptions.RequestException as e:
@@ -107,17 +118,24 @@ def marathon_startapp(filename):
 		raise
 
 @marathon.command('changeEnv')
-@click.argument('name')
-@click.argument('filename')
-def marathon_changeapp(name,filename):
-	"""Change settings of an app. Read changes from a jsonfile."""
+@click.argument('id')
+@click.option('--env',default= {"URL" : "http://test"},help='change the environment variable of a docker container')
+def marathon_changeapp(id,env):
+	"""Change settings of an app.Change the docker env variable.Overrides the actually setting."""
  
 	try:
-		url = BASEURL+APIVERSION+'apps/'+name
-		fileData = open(filename)
-		payload = json.load(fileData)
+		c = MarathonClient('http://localhost:8080')
+		r = requests.get(BASEURL+APIVERSION+'apps/'+id)
+		app = c._parse_response(r, MarathonApp, resource_name='app')
+		url = BASEURL+APIVERSION+'apps/'+id
+		backup = {}
+		backup.update(app.env)
+		backup.update(json.loads(env))
+		app = MarathonApp(id=id);
+		app.env = backup
+		payload = app.to_json()
 		headers = {'content-type':'application/json'}
-		r = requests.put(url,data=json.dumps(payload),headers=headers)
+		r = requests.put(url,payload,headers=headers)
 		print r.text
 
 	except requests.exceptions.RequestException as e:
@@ -128,13 +146,13 @@ def marathon_changeapp(name,filename):
 		raise
 
 @marathon.command('scale')
-@click.argument('name')
+@click.argument('id')
 @click.argument('count')
 def marathon_scaleapp(name,count):
 	"""Scale an running app."""
  
 	try:
-		url = BASEURL+APIVERSION+'apps/'+name
+		url = BASEURL+APIVERSION+'apps/'+id
 		payload = {"instances" : count }
 		headers = {'content-type':'application/json'}
 		r = requests.put(url,data=json.dumps(payload),headers=headers)
