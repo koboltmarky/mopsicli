@@ -12,6 +12,8 @@ from marathon import MarathonClient
 #APIVERSION = '/v2/'
 BASEURL = 'http://127.0.0.1:3000'
 APIVERSION = '/v1/'
+#DOCKERURL = 'http://mesosmaster02:4243/'
+DOCKERURL = 'http://127.0.0.1:3000/'
 
 @click.group()
 @click.version_option()
@@ -119,20 +121,29 @@ def marathon_startapp(image,instances,mem,cpus,cmd,id):
 
 @marathon.command('changeEnv')
 @click.argument('id')
-@click.option('--env',default= {"URL" : "http://test"},help='change the environment variable of a docker container')
-def marathon_changeapp(id,env):
-	"""Change settings of an app.Change the docker env variable.Overrides the actually setting."""
+@click.option('--env',help='change the environment variable of a docker container')
+@click.option('--cmd',help='change the cmd param')
+def marathon_changeapp(id,env,cmd):
+	"""Change settings of an app.Change the env variable."""
  
 	try:
-		c = MarathonClient('http://localhost:8080')
+		c = MarathonClient('')
 		r = requests.get(BASEURL+APIVERSION+'apps/'+id)
 		app = c._parse_response(r, MarathonApp, resource_name='app')
 		url = BASEURL+APIVERSION+'apps/'+id
-		backup = {}
-		backup.update(app.env)
-		backup.update(json.loads(env))
-		app = MarathonApp(id=id);
-		app.env = backup
+		
+		if env:
+			backup = {}
+			backup.update(app.env)
+			backup.update(json.loads(env))
+			app = MarathonApp(id=id);
+			app.env = backup
+		else:
+			app = MarathonApp(id=id);
+		
+		if cmd:
+			app.cmd = cmd
+		
 		payload = app.to_json()
 		headers = {'content-type':'application/json'}
 		r = requests.put(url,payload,headers=headers)
@@ -148,7 +159,7 @@ def marathon_changeapp(id,env):
 @marathon.command('scale')
 @click.argument('id')
 @click.argument('count')
-def marathon_scaleapp(name,count):
+def marathon_scaleapp(id,count):
 	"""Scale an running app."""
  
 	try:
@@ -157,6 +168,44 @@ def marathon_scaleapp(name,count):
 		headers = {'content-type':'application/json'}
 		r = requests.put(url,data=json.dumps(payload),headers=headers)
 		print r.text
+
+	except requests.exceptions.RequestException as e:
+		print 'HTTP error: ', e 
+
+	except:
+		print 'Unexpected error:', sys.exc_info()[0]  
+		raise
+
+@cli.group()
+def docker():
+	"""Docker commands"""
+
+@docker.command('listContainers')
+def docker_listContainer():
+	"""List containers"""
+
+	try:
+		r = requests.get(DOCKERURL+'containers/json')
+		data = r.json()  
+		print json.dumps(data,indent=4) 
+	
+	except requests.exceptions.RequestException as e:
+		print 'HTTP error: ', e 
+
+	except:
+		print 'Unexpected error:', sys.exc_info()[0]  
+		raise
+
+@docker.command('tail')
+@click.argument('id')
+def docker_tail(id):
+	"""Tail stdout of a container"""
+	try:
+		r = requests.get(DOCKERURL+'containers/'+ id +'/logs?stderr=1&stdout=1&timestamps=1&follow=1&tail=10',stream=True)
+		print r.headers
+		for line in r.iter_lines(chunk_size=10):
+			if line:
+				print line
 
 	except requests.exceptions.RequestException as e:
 		print 'HTTP error: ', e 
