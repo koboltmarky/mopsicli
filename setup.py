@@ -6,8 +6,6 @@ setup(
     py_modules=['mopsicli'],
     install_requires=[
         'Click',
-	'json',
-	'sys',
 	'requests',
 	'termcolor',
 	'marathon',
