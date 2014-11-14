@@ -8,8 +8,6 @@ from marathon.models.container import MarathonContainer
 from marathon.models.container import MarathonDockerContainer
 from marathon import MarathonClient
 
-#BASEURL = 'http://mesosmaster02:8080'
-#APIVERSION = '/v2/'
 BASEURL = 'http://127.0.0.1:3000'
 APIVERSION = '/v1/'
 #DOCKERURL = 'http://mesosmaster02:4243/'
@@ -186,6 +184,7 @@ def docker_listContainer():
 
 	try:
 		r = requests.get(DOCKERURL+'containers/json')
+		print r.content
 		data = r.json()  
 		print json.dumps(data,indent=4) 
 	
