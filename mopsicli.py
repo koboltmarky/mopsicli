@@ -6,6 +6,7 @@ from termcolor import colored
 from marathon.models import MarathonApp
 from marathon.models.container import MarathonContainer
 from marathon.models.container import MarathonDockerContainer
+from marathon.models.container import MarathonContainerPortMapping
 from marathon import MarathonClient
 
 BASEURL = 'http://127.0.0.1:3000'
@@ -93,16 +94,32 @@ def marathon_killapp(id):
 @marathon.command('start')
 @click.argument('id')
 @click.argument('image')
-@click.argument('cmd')
+@click.argument('cmd',required=False)
 @click.option('--instances',default=1,help='number of instances')
 @click.option('--mem',default=64,help='memory to use')
 @click.option('--cpus',default=1,help='cpus to use')
-def marathon_startapp(image,instances,mem,cpus,cmd,id):
+@click.option('--ports',help='ports the app is listen to.Sytnaxt: port1,port2 or port1:hostport1:serviceport1,port2:hostport2:serviceport2')
+def marathon_startapp(image,instances,mem,cpus,cmd,id,ports):
 	"""Start a app."""
 	
 	try:
 		url =  BASEURL+APIVERSION+'apps' 
-		dockerContainer = MarathonDockerContainer(image,'BRIDGE',[])
+		portsPairList = ports.split(',')
+		portsMappingList = []
+		for portPair in portsPairList:
+			tmpPortList = portPair.split(':')
+			container_port = tmpPortList[0]
+			try:
+				host_port = tmpPortList[1]	
+				service_port = tmpPortList[2]
+			except IndexError:
+				host_port =	0
+				service_port = 0
+			
+			portmapping = MarathonContainerPortMapping(container_port=container_port,host_port=host_port,service_port=service_port,protocol='tcp')
+			portsMappingList.append(portmapping)
+		
+		dockerContainer = MarathonDockerContainer(image,'BRIDGE',portsMappingList)
 		marathonContainer = MarathonContainer(dockerContainer,'DOCKER',[])
 		app = MarathonApp(id=id,cmd=cmd,mem=mem,cpus=cpus,container=marathonContainer,instances=instances)
 		payload = app.to_json()
@@ -119,11 +136,11 @@ def marathon_startapp(image,instances,mem,cpus,cmd,id):
 
 @marathon.command('changeEnv')
 @click.argument('id')
-@click.option('--env',help='change the environment variable of a docker container')
+@click.option('--env',help='change the environment variable of a docker container.\nExample: --env \'{"testurl":"test"}\'')
 @click.option('--cmd',help='change the cmd param')
 def marathon_changeapp(id,env,cmd):
 	"""Change settings of an app.Change the env variable."""
- 
+  
 	try:
 		c = MarathonClient('')
 		r = requests.get(BASEURL+APIVERSION+'apps/'+id)
@@ -184,8 +201,8 @@ def docker_listContainer():
 
 	try:
 		r = requests.get(DOCKERURL+'containers/json')
-		print r.content
 		data = r.json()  
+		#print data
 		print json.dumps(data,indent=4) 
 	
 	except requests.exceptions.RequestException as e:
