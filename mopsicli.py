@@ -97,8 +97,8 @@ def marathon_killapp(id):
 @click.argument('cmd',required=False)
 @click.option('--instances',default=1,help='number of instances')
 @click.option('--mem',default=64,help='memory to use')
-@click.option('--cpus',default=1,help='cpus to use')
-@click.option('--ports',help='ports the app is listen to.Sytnaxt: port1,port2 or port1:hostport1:serviceport1,port2:hostport2:serviceport2')
+@click.option('--cpus',default=0.5,help='cpus to use')
+@click.option('--ports',default='0,0,0',help='ports the app is listen to.Sytnaxt: port1,port2 or port1:hostport1:serviceport1,port2:hostport2:serviceport2')
 def marathon_startapp(image,instances,mem,cpus,cmd,id,ports):
 	"""Start a app."""
 	
