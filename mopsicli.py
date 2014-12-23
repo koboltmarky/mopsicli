@@ -98,30 +98,36 @@ def marathon_killapp(id):
 @click.option('--instances',default=1,help='number of instances')
 @click.option('--mem',default=64,help='memory to use')
 @click.option('--cpus',default=0.5,help='cpus to use')
-@click.option('--ports',default='0,0,0',help='ports the app is listen to.Sytnaxt: port1,port2 or port1:hostport1:serviceport1,port2:hostport2:serviceport2')
+@click.option('--ports',default='0:0:0',help='ports the app is listen to.Sytnaxt: port1,port2 or port1:hostport1:serviceport1,port2:hostport2:serviceport2')
 def marathon_startapp(image,instances,mem,cpus,cmd,id,ports):
 	"""Start a app."""
 	
 	try:
 		url =  BASEURL+APIVERSION+'apps' 
-		portsPairList = ports.split(',')
-		portsMappingList = []
-		for portPair in portsPairList:
-			tmpPortList = portPair.split(':')
-			container_port = tmpPortList[0]
-			try:
-				host_port = tmpPortList[1]	
-				service_port = tmpPortList[2]
-			except IndexError:
-				host_port =	0
-				service_port = 0
+		if ports is None:
+			dockerContainer = MarathonDockerContainer(image,'BRIDGE')
+			marathonContainer = MarathonContainer(dockerContainer,'DOCKER',[])
+			app = MarathonApp(id=id,cmd=cmd,mem=mem,cpus=cpus,container=marathonContainer,instances=instances)
+		else: 
+			portsPairList = ports.split(',')
+			portsMappingList = []
+			for portPair in portsPairList:
+				tmpPortList = portPair.split(':')
+				container_port = tmpPortList[0]
+				try:
+					host_port = tmpPortList[1]	
+					service_port = tmpPortList[2]
+				except IndexError:
+					host_port =	0
+					service_port = 0
 			
-			portmapping = MarathonContainerPortMapping(container_port=container_port,host_port=host_port,service_port=service_port,protocol='tcp')
-			portsMappingList.append(portmapping)
+				portmapping = MarathonContainerPortMapping(container_port=container_port,host_port=host_port,service_port=service_port,protocol='tcp')
+				portsMappingList.append(portmapping)
 		
-		dockerContainer = MarathonDockerContainer(image,'BRIDGE',portsMappingList)
-		marathonContainer = MarathonContainer(dockerContainer,'DOCKER',[])
-		app = MarathonApp(id=id,cmd=cmd,mem=mem,cpus=cpus,container=marathonContainer,instances=instances)
+			dockerContainer = MarathonDockerContainer(image,'BRIDGE',portsMappingList)
+			marathonContainer = MarathonContainer(dockerContainer,'DOCKER',[])
+			app = MarathonApp(id=id,cmd=cmd,mem=mem,cpus=cpus,container=marathonContainer,instances=instances)
+		
 		payload = app.to_json()
 		headers = {'content-type':'application/json'}
 		r = requests.post(url,payload,headers=headers)
